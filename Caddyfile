@@ -1,0 +1,7 @@
+{$SERVER_IP}.nip.io:443 {
+    tls internal
+    reverse_proxy http://openclaw-gateway:18789 {
+        header_up Host localhost:18789
+        header_up Origin http://localhost:18789
+    }
+}
