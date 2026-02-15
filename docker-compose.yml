@@ -2,6 +2,9 @@ services:
   openclaw-gateway:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     environment:
+      TZ: Asia/Shanghai
+      OPENAI_API_KEY: sk-2dfc838a1f974e3f9fb2857cf0ca7a77
+      OPENAI_BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
       HOME: /home/node
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
@@ -12,6 +15,7 @@ services:
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - /data/search-mcp:/app/search-mcp
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
@@ -32,6 +36,7 @@ services:
   openclaw-cli:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     environment:
+      TZ: Asia/Shanghai
       HOME: /home/node
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
@@ -51,8 +56,16 @@ services:
     image: caddy:latest
     restart: unless-stopped
     ports:
-      - "18443:443"
+      - "18443:18443"
+      - "18080:80"
     environment:
+      - TZ=Asia/Shanghai
       - SERVER_IP=${SERVER_IP}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

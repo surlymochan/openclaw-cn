@@ -7,7 +7,7 @@ if [ -f "$KEYS_FILE" ]; then
 fi
 
 SERVER_IP="${1:-$SERVER_IP}"
-CONTAINER="openclaw-src-openclaw-gateway-1"
+CONTAINER="openclaw-deploy-openclaw-gateway-1"
 
 # 检查参数 (如果 Env 也没加载到)
 if [ -z "$SERVER_IP" ]; then

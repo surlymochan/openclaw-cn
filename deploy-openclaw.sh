@@ -1,24 +1,21 @@
 #!/bin/bash
 
 # ==========================================
-# OpenClaw 一键部署脚本 (无源码版)
+# OpenClaw 一键部署脚本 (本地源码版)
 # ==========================================
 
 # 0. 加载私有配置 (如果存在)
-# 允许从 keys 目录自动加载 IP，方便开发者调试
 KEYS_FILE="../../private/keys/openclaw-docker-cn/deploy.env"
 if [ -f "$KEYS_FILE" ]; then
     echo "🔑 [0/5] 加载私有配置: $KEYS_FILE"
-    set -a # 自动导出变量
+    set -a
     source "$KEYS_FILE"
     set +a
 fi
 
-# 优先使用命令行参数，如果为空则使用 Env 里的默认值
 SERVER_IP="${1:-$SERVER_IP}"
 SERVER_USER="${2:-${SERVER_USER:-root}}"
 
-# 检查参数
 if [ -z "$SERVER_IP" ]; then
     echo "❌ 错误: 未指定服务器IP"
     echo "用法: ./deploy-openclaw.sh <SERVER_IP> [USER]"
@@ -29,24 +26,31 @@ REMOTE_DIR="/data/openclaw-deploy"
 CONFIG_DIR="/root/.openclaw"
 WORKSPACE_DIR="/root/.openclaw/workspace"
 TEMP_SRC="openclaw-src-tmp"
+LOCAL_SRC="/Users/chenchao/workspace/project/public/openclaw"
+CONFIG_FILE="$CONFIG_DIR/openclaw.json"
 
-# 1. 准备源码
-echo "📥 [1/5] 拉取最新 OpenClaw 源码..."
+echo "📥 [1/5] 复制本地 OpenClaw 源码..."
 rm -rf $TEMP_SRC
-git clone https://github.com/openclaw/openclaw.git $TEMP_SRC
+
+if [ ! -d "$LOCAL_SRC" ]; then
+    echo "❌ 错误: 本地源码目录不存在: $LOCAL_SRC"
+    exit 1
+fi
+
+rsync -av --exclude='.git' --exclude='CLAUDE.md' "$LOCAL_SRC/" "$TEMP_SRC/"
+if [ $? -ne 0 ]; then
+    echo "❌ 源码复制失败"
+    exit 1
+fi
+echo "✅ 已从 $LOCAL_SRC 复制源码"
 
 echo "💉 [2/5] 注入定制 Dockerfile..."
-# 将我们的定制 Dockerfile 覆盖到源码目录
 cp Dockerfile $TEMP_SRC/
 
-# 2. 同步到服务器
 echo "🚀 [3/5] 同步构建上下文到服务器: $SERVER_IP..."
 ssh $SERVER_USER@$SERVER_IP "mkdir -p $REMOTE_DIR/context $CONFIG_DIR $WORKSPACE_DIR"
 
-# 同步源码+Dockerfile 到 context 目录
 rsync -avz --exclude '.git' --delete $TEMP_SRC/ $SERVER_USER@$SERVER_IP:$REMOTE_DIR/context/
-
-# 同步编排文件 到 根目录
 rsync -avz docker-compose.yml Caddyfile $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
 
 if [ $? -ne 0 ]; then
@@ -54,18 +58,36 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 3. 远程构建与运行
 echo "🐳 [4/5] 远程构建镜像并启动..."
 ssh $SERVER_USER@$SERVER_IP << EOF
     set -e
     cd $REMOTE_DIR
-    
-    # 导出 IP 供 Caddy 使用
     export SERVER_IP=$SERVER_IP
     
-    # 生成 .env
-    if [ ! -f .env ]; then
-        TOKEN=\$(openssl rand -hex 16)
+    # 检查现有配置中的 Token
+    EXISTING_TOKEN=""
+    if [ -f "$CONFIG_FILE" ]; then
+        EXISTING_TOKEN=\$(cat $CONFIG_FILE | grep -o '"token": "[^"]*"' | cut -d'"' -f4)
+        if [ -n "\$EXISTING_TOKEN" ]; then
+            echo "ℹ️  检测到现有配置，使用已有 Token"
+        fi
+    fi
+    
+    # 生成或复用 Token
+    if [ -f .env ]; then
+        # 保留现有 .env 中的 Token
+        if [ -z "\$EXISTING_TOKEN" ]; then
+            EXISTING_TOKEN=\$(grep "OPENCLAW_GATEWAY_TOKEN=" .env | cut -d'=' -f2)
+        fi
+        echo "ℹ️  保留现有 .env 配置"
+    else
+        # 生成新 Token（如果没有现有配置）
+        if [ -z "\$EXISTING_TOKEN" ]; then
+            TOKEN=\$(openssl rand -hex 16)
+        else
+            TOKEN="\$EXISTING_TOKEN"
+        fi
+        
         cat > .env << EENV
 OPENCLAW_IMAGE=openclaw:local
 OPENCLAW_GATEWAY_TOKEN=\$TOKEN
@@ -79,34 +101,57 @@ TRUSTED_PROXIES="0.0.0.0/0"
 CLAUDE_AI_SESSION_KEY=""
 SERVER_IP=$SERVER_IP
 EENV
-    else
-        # 更新 .env 中的 SERVER_IP (如果变了)
-        # 简单替换：如果存在 SERVER_IP=... 则替换，否则追加
-        if grep -q "SERVER_IP=" .env; then
-            sed -i "s/^SERVER_IP=.*/SERVER_IP=$SERVER_IP/" .env
-        else
-            echo "SERVER_IP=$SERVER_IP" >> .env
+        echo "✅ 已生成 .env 文件"
+    fi
+    
+    # 如果检测到现有配置，确保 .env 中的 Token 与配置一致
+    if [ -n "\$EXISTING_TOKEN" ]; then
+        if grep -q "OPENCLAW_GATEWAY_TOKEN=" .env; then
+            sed -i "s/^OPENCLAW_GATEWAY_TOKEN=.*/OPENCLAW_GATEWAY_TOKEN=\$EXISTING_TOKEN/" .env
+            echo "✅ 已同步 .env Token 与现有配置一致"
         fi
     fi
     
-    # 构建
+    # 更新 SERVER_IP
+    if grep -q "SERVER_IP=" .env; then
+        sed -i "s/^SERVER_IP=.*/SERVER_IP=$SERVER_IP/" .env
+    else
+        echo "SERVER_IP=$SERVER_IP" >> .env
+    fi
+    
+    # 显示当前使用的 Token
+    CURRENT_TOKEN=\$(grep "OPENCLAW_GATEWAY_TOKEN=" .env | cut -d'=' -f2)
+    echo "🔑 当前 Token: \$CURRENT_TOKEN"
+    
     echo "Building Docker Image..."
     cd context
     docker build -t openclaw:local .
     cd ..
     
-    # 启动
     echo "Starting Services..."
-    # 确保 docker-compose 能读到 .env 中的 SERVER_IP
     docker compose up -d
     
-    # 清理远程源码 (节省空间)
     rm -rf context
+    
+    echo ""
+    echo "⏳ 等待服务启动..."
+    sleep 5
+    
+    echo ""
+    echo "📊 容器状态:"
+    docker ps | grep openclaw-deploy || true
 EOF
 
-# 4. 本地清理
 echo "🧹 [5/5] 清理本地临时文件..."
 rm -rf $TEMP_SRC
 
+echo ""
 echo "✅ 部署完成！"
-echo "Web UI: https://$SERVER_IP.nip.io:18443"
+echo ""
+echo "🔗 Web UI: https://$SERVER_IP.nip.io:18443"
+echo ""
+echo "📋 获取 Token:"
+echo "   ssh $SERVER_USER@$SERVER_IP \"cat /data/openclaw-deploy/.env | grep TOKEN\""
+echo ""
+echo "⚠️  如果这是首次部署或重新生成 Token，请在 Web UI 的 Overview 页面输入 Token"
+echo "   如果已有配置，Token 已自动同步，直接访问即可"

@@ -1,6 +1,7 @@
-{$SERVER_IP}.nip.io:443 {
+{$SERVER_IP}.nip.io:18443 {
+    bind 0.0.0.0
     tls internal
-    reverse_proxy http://openclaw-gateway:18789 {
+    reverse_proxy http://openclaw-deploy-openclaw-gateway-1:18789 {
         header_up Host localhost:18789
         header_up Origin http://localhost:18789
     }
