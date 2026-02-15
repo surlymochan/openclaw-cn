@@ -16,7 +16,6 @@ One command to deploy OpenClaw.
 | 🔥 **Out of Box** | Built-in qwen3-max model |
 | 🇨🇳 **CN Optimized** | NPM mirror, network issues solved |
 | 🔒 **HTTPS Direct** | Caddy proxy, no SSH tunnel needed |
-| 🛠 **Chinese Support** | Feishu/Search MCP integration |
 
 ---
 
