@@ -6,7 +6,17 @@ One command to deploy OpenClaw.
 ./deploy-openclaw.sh <YOUR_SERVER_IP>
 ```
 
-That's it.
+---
+
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| 🚀 **One-Click** | Clone and run, no manual config |
+| 🔥 **Out of Box** | Built-in qwen3-max model |
+| 🇨🇳 **CN Optimized** | NPM mirror, network issues solved |
+| 🔒 **HTTPS Direct** | Caddy proxy, no SSH tunnel needed |
+| 🛠 **Chinese Support** | Feishu/Search MCP integration |
 
 ---
 
@@ -21,29 +31,26 @@ cd openclaw-docker-cn
 ./deploy-openclaw.sh
 ```
 
-The script will:
-- Fetch source code
-- Build image
-- Start services
-- Configure qwen3-max model
+Done automatically:
+- Fetch source → Build image → Start services → Configure model
 
-Visit `https://<IP>.nip.io:18443`, done.
+Visit `https://<IP>.nip.io:18443`, you're in.
 
 ---
 
 ## FAQ
 
-### Where's the pairing token?
+**Where is the token?**
 ```bash
 ssh root@<IP> "cat /data/openclaw-deploy/.env | grep TOKEN"
 ```
 
-### How to restart?
+**How to restart?**
 ```bash
 ssh root@<IP> "cd /data/openclaw-deploy && docker compose restart"
 ```
 
-### View logs?
+**View logs?**
 ```bash
 ssh root@<IP> "docker logs openclaw-deploy-openclaw-gateway-1 -f"
 ```
@@ -52,7 +59,7 @@ ssh root@<IP> "docker logs openclaw-deploy-openclaw-gateway-1 -f"
 
 ## Advanced
 
-### Enable LLM (Optional)
+### Enable LLM
 
 Create `../../private/keys/openclaw-docker-cn/llm.env`:
 
@@ -62,7 +69,7 @@ BAILIAN_API_KEY=your-key
 
 Re-run deploy.
 
-### Use Local Source
+### Local Source Debug
 
 ```bash
 ./deploy-openclaw.sh <IP> /path/to/openclaw
@@ -71,9 +78,10 @@ Re-run deploy.
 ---
 
 ## Default Config
+
 - Model: qwen3-max (80k context)
 - Port: 18443 (HTTPS)
-- Gateway: http://<IP>:18789
+- Gateway: 18789
 
 ---
 
