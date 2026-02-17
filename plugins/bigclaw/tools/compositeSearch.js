@@ -109,23 +109,65 @@ export function registerCompositeSearchTool(api) {
             return { content: [{ type: "text", text: "错误: BAIDU_API_KEY 未配置" }] };
           }
           
-          const url = "https://qianfan.baidubce.com/v2/ai_search/chat/completions";
-          const payload = {
+          // Try AI Search first
+          const aiSearchUrl = "https://qianfan.baidubce.com/v2/ai_search/chat/completions";
+          const aiSearchPayload = {
             messages: [{ content: query, role: "user" }],
             model: "ernie-4.5-turbo-32k",
             search_source: "baidu_search_v2",
             resource_type_filter: [{ type: "web", top_k: 10 }]
           };
           
-          console.log("[DEBUG] Baidu API call with query:", query);
+          console.log("[DEBUG] Baidu AI Search API call with query:", query);
           
-          const response = await fetchWithTimeout(url, 15000, {
+          try {
+            const response = await fetchWithTimeout(aiSearchUrl, 30000, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${baiduApiKey}`
+              },
+              body: JSON.stringify(aiSearchPayload)
+            });
+            
+            const data = await response.json();
+            
+            if (data.choices && data.choices.length > 0) {
+              const content = data.choices[0].message.content;
+              let result = `【百度AI搜索】\n\n${content}\n\n`;
+              
+              if (data.references && data.references.length > 0) {
+                result += "参考资料:\n";
+                data.references.slice(0, 5).forEach((ref, index) => {
+                  result += `${index + 1}. [${ref.title}](${ref.url})\n`;
+                });
+              }
+              
+              return { content: [{ type: "text", text: result }] };
+            } else {
+              console.log("[DEBUG] AI Search returned no choices, trying regular chat completion");
+            }
+          } catch (searchError) {
+            console.log("[DEBUG] AI Search failed:", searchError.message);
+            console.log("[DEBUG] Falling back to regular chat completion");
+          }
+          
+          // Fallback to regular chat completion
+          const chatUrl = "https://qianfan.baidubce.com/v2/chat/completions";
+          const chatPayload = {
+            messages: [{ content: `请搜索并回答: ${query}`, role: "user" }],
+            model: "ernie-4.5-turbo-32k"
+          };
+          
+          console.log("[DEBUG] Baidu Chat API call with query:", query);
+          
+          const response = await fetchWithTimeout(chatUrl, 30000, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${baiduApiKey}`
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(chatPayload)
           });
           
           const data = await response.json();
@@ -133,14 +175,6 @@ export function registerCompositeSearchTool(api) {
           if (data.choices && data.choices.length > 0) {
             const content = data.choices[0].message.content;
             let result = `【百度AI搜索】\n\n${content}\n\n`;
-            
-            if (data.references && data.references.length > 0) {
-              result += "参考资料:\n";
-              data.references.slice(0, 5).forEach((ref, index) => {
-                result += `${index + 1}. [${ref.title}](${ref.url})\n`;
-              });
-            }
-            
             return { content: [{ type: "text", text: result }] };
           } else {
             return { content: [{ type: "text", text: `百度搜索失败: ${data.message || "未知错误"}` }] };
