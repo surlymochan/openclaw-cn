@@ -12,14 +12,15 @@ log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-KEYS_FILE="../../private/keys/openclaw-docker-cn/deploy.env"
-if [ -f "$KEYS_FILE" ]; then
+# Load environment files from current directory
+SEARCH_KEYS_FILE="./search.env"
+if [ -f "$SEARCH_KEYS_FILE" ]; then
     set -a
-    source "$KEYS_FILE"
+    source "$SEARCH_KEYS_FILE"
     set +a
 fi
 
-LLM_KEYS_FILE="../../private/keys/openclaw-docker-cn/llm.env"
+LLM_KEYS_FILE="./llm.env"
 if [ -f "$LLM_KEYS_FILE" ]; then
     set -a
     source "$LLM_KEYS_FILE"
@@ -126,7 +127,7 @@ EENV
     CURRENT_TOKEN=$(grep "OPENCLAW_GATEWAY_TOKEN=" .env | cut -d'=' -f2)
     echo "Token: $CURRENT_TOKEN"
     
-    # 生成 openclaw.json 配置（qwen3-max 模型）
+    # 生成 openclaw.json 配置（qwen3-max 模型 + 复合搜索插件）
     BAILIAN_API_KEY_PARAM="${BAILIAN_API_KEY:-}"
     if [ -n "$BAILIAN_API_KEY_PARAM" ]; then
         cat > "$CONFIG_DIR/openclaw.json" << GCONFIG
@@ -168,6 +169,21 @@ EENV
     "native": "auto",
     "nativeSkills": "auto"
   },
+  "tools": {
+    "deny": ["web_search"],
+    "allow": ["composite_search"]
+  },
+  "plugins": {
+    "enabled": true,
+    "load": {
+      "paths": ["/app/plugins/bigclaw"]
+    },
+    "entries": {
+      "bigclaw": {
+        "enabled": true
+      }
+    }
+  },
   "gateway": {
     "port": 18789,
     "controlUi": {
@@ -179,7 +195,7 @@ EENV
   }
 }
 GCONFIG
-        echo "已生成 openclaw.json 配置（qwen3-max）"
+        echo "已生成 openclaw.json 配置（qwen3-max + 复合搜索插件）"
     fi
     
     # 修复权限

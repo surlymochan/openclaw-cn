@@ -55,13 +55,13 @@ cd openclaw-docker-cn
 ```
 
 ### 配置搜索 API Keys
-创建 `../../private/keys/openclaw-docker-cn/search.env`：
+在项目根目录下创建 `search.env` 文件：
 ```bash
 GAODE_API_KEY=your-gaode-key
 BAIDU_API_KEY=your-baidu-api-key
 ```
 
-重新部署即可启用搜索功能。
+然后重新部署即可启用搜索功能。
 
 ---
 
@@ -88,7 +88,7 @@ ssh root@<IP> "docker logs openclaw-deploy-openclaw-gateway-1 -f"
 
 ### 启用模型对话
 
-创建 `../../private/keys/openclaw-docker-cn/llm.env`：
+在项目根目录下创建 `llm.env` 文件：
 
 ```bash
 BAILIAN_API_KEY=your-key

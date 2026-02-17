@@ -12,10 +12,10 @@ services:
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
       BAILIAN_API_KEY: ${BAILIAN_API_KEY}
       GAODE_API_KEY: ${GAODE_API_KEY}
-      BAIDU_ACCESS_KEY: ${BAIDU_ACCESS_KEY}
-      BAIDU_SECRET_KEY: ${BAIDU_SECRET_KEY}
+      BAIDU_API_KEY: ${BAIDU_API_KEY}
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
+      - ./plugins:/app/plugins
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
