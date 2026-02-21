@@ -195,10 +195,12 @@ const bigclawPlugin = {
               search_source: "baidu_search_v2",
               resource_type_filter: [{ type: "web", top_k: 10 }]
             };
-            const maxAttempts = 3;
-            const timeoutPerAttempt = 20000;
+            // 正常调用秒级返回。不传 runSignal 给 fetch，避免网关提前 abort 导致外层返回「搜索超时」；仅用 8s×2 本地超时
+            const maxAttempts = 2;
+            const timeoutPerAttempt = 8000;
             let lastError = null;
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              if (runSignal?.aborted) throw Object.assign(new Error("aborted"), { name: "AbortError" });
               try {
                 console.log("[DEBUG] Baidu web_search attempt", attempt, "/", maxAttempts, "query:", q);
                 const response = await fetchWithTimeout(url, timeoutPerAttempt, {
@@ -208,7 +210,7 @@ const bigclawPlugin = {
                     "Authorization": `Bearer ${baiduApiKey}`
                   },
                   body: JSON.stringify(payload)
-                }, runSignal);
+                }, undefined);
                 const data = await response.json();
                 if (data.code !== undefined && data.code !== 0) {
                   lastError = data.message || String(data.code);

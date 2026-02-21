@@ -115,43 +115,68 @@ const bigclawPlugin = {
             if (!baiduApiKey) {
               return { content: [{ type: "text", text: "错误: BAIDU_API_KEY 未配置" }] };
             }
-            
-            const url = "https://qianfan.baidubce.com/v2/ai_search/chat/completions";
+            const url = "https://qianfan.baidubce.com/v2/ai_search/web_search";
+            const q = query.slice(0, 72);
             const payload = {
-              messages: [{ content: query, role: "user" }],
-              model: "ernie-4.5-turbo-32k",
+              messages: [{ role: "user", content: q }],
+              edition: "lite",
               search_source: "baidu_search_v2",
               resource_type_filter: [{ type: "web", top_k: 10 }]
             };
-            
-            console.log("[DEBUG] Baidu API call with query:", query);
-            
-            const response = await fetchWithTimeout(url, 25000, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${baiduApiKey}`
-              },
-              body: JSON.stringify(payload)
-            }, runSignal);
-            
-            const data = await response.json();
-            
-            if (data.choices && data.choices.length > 0) {
-              const content = data.choices[0].message.content;
-              let result = `【百度AI搜索】\n\n${content}\n\n`;
-              
-              if (data.references && data.references.length > 0) {
-                result += "参考资料:\n";
-                data.references.slice(0, 5).forEach((ref, index) => {
-                  result += `${index + 1}. [${ref.title}](${ref.url})\n`;
+            // 正常调用秒级返回。不传 runSignal 给 fetch，避免网关提前 abort；仅用 8s×2 本地超时
+            const maxAttempts = 2;
+            const timeoutPerAttempt = 8000;
+            let lastError: string | null = null;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              if (runSignal?.aborted) throw Object.assign(new Error("aborted"), { name: "AbortError" });
+              try {
+                console.log("[DEBUG] Baidu web_search attempt", attempt, "/", maxAttempts, "query:", q);
+                const response = await fetchWithTimeout(url, timeoutPerAttempt, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${baiduApiKey}`
+                  },
+                  body: JSON.stringify(payload)
+                }, undefined);
+                const data = await response.json();
+                if (data.code !== undefined && data.code !== 0) {
+                  lastError = data.message || String(data.code);
+                  if (attempt < maxAttempts) {
+                    await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, attempt - 1), 5000)));
+                    continue;
+                  }
+                  return { content: [{ type: "text", text: `百度搜索失败: ${lastError}` }] };
+                }
+                const refs = data.references || [];
+                if (refs.length === 0) {
+                  return { content: [{ type: "text", text: "未找到相关结果，请换关键词再试。" }] };
+                }
+                let result = `【百度搜索】\n\n共 ${refs.length} 条结果：\n\n`;
+                refs.slice(0, 10).forEach((ref: { title?: string; url?: string; content?: string }, i: number) => {
+                  result += `${i + 1}. ${ref.title || "无标题"}\n`;
+                  result += `   ${ref.url || ""}\n`;
+                  if (ref.content) result += `   ${ref.content.slice(0, 200)}${ref.content.length > 200 ? "…" : ""}\n`;
+                  result += "\n";
                 });
+                return { content: [{ type: "text", text: result }] };
+              } catch (err: unknown) {
+                const e = err as Error;
+                lastError = e?.message ?? String(err);
+                const isAbort = e?.name === "AbortError" || /aborted|timeout/i.test(lastError);
+                console.log("[DEBUG] Baidu attempt", attempt, "failed:", lastError, isAbort ? "(timeout/abort)" : "");
+                if (runSignal?.aborted) throw err;
+                if (attempt < maxAttempts) {
+                  await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, attempt - 1), 5000)));
+                  continue;
+                }
+                if (isAbort) {
+                  return { content: [{ type: "text", text: "百度搜索多次超时，请稍后重试或换更短的关键词。" }] };
+                }
+                return { content: [{ type: "text", text: `搜索错误: ${lastError}` }] };
               }
-              
-              return { content: [{ type: "text", text: result }] };
-            } else {
-              return { content: [{ type: "text", text: `百度搜索失败: ${data.message || "未知错误"}` }] };
             }
+            return { content: [{ type: "text", text: `百度搜索失败: ${lastError || "未知错误"}` }] };
           }
           
           return { content: [{ type: "text", text: "未知搜索源" }] };
