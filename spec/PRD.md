@@ -2,10 +2,10 @@
 
 本文档为 **openclaw-cn** 发布版的产品需求与验收视图。
 
-## 能力范围（当前版本 v2026.2.19）
+## 能力范围（当前版本 v2026.2.21）
 
 1. **模型**：阿里百炼 qwen3-max（80k context，8k max tokens）。
-2. **工具**：composite_search（百度千帆 web_search 接口 + 高德 POI）；禁用内置 web_search。
+2. **工具**：composite_search（百度千帆 web_search 接口 + 高德 POI）；禁用内置 web_search。百度分支已修复网关超时导致的中断（SP0223：web_search、8s×2、不传 runSignal）。
 3. **插件**：bigclaw（OpenClaw Plugin），加载路径 `/app/bigclaw`。
 4. **通道**：飞书（webhookPath /webhooks/feishu，dmPolicy open，allowFrom *）。
 5. **Skills**：find-skills、skill-creator 等（镜像内置）。

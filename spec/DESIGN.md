@@ -15,8 +15,8 @@
 
 ## 插件与工具
 
-- bigclaw：源码在 **src/bigclaw/**，部署时 rsync 到服务器，compose 挂载为 /app/bigclaw。
-- composite_search：支持 source（baidu/gaode/auto）、query，以及 region/landmark/keyword（高德 POI）。百度分支使用千帆 web_search API，返回 references 列表。
+- bigclaw：源码在 **src/bigclaw/**，**唯一源码为 index.ts**，index.js 由 `npm run build` 生成；部署时 rsync 到服务器，compose 挂载为 /app/bigclaw。
+- composite_search：支持 source（baidu/gaode/auto）、query，以及 region/landmark/keyword（高德 POI）。百度分支使用千帆 web_search API，返回 references 列表；超时策略为 8s×2、不传 runSignal 给 fetch，避免网关提前 abort（SP0223）。
 
 ## 密钥注入
 

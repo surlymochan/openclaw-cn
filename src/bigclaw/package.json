@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
   "dependencies": {
     "@sinclair/typebox": "^0.32.0",
     "axios": "^1.6.0"

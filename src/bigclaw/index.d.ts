@@ -1,9 +1,12 @@
-declare const compositeSearchPlugin: {
+declare const bigclawPlugin: {
     id: string;
     name: string;
     description: string;
     kind: string;
-    configSchema: any;
+    configSchema: {
+        type: string;
+    };
     register(api: any): void;
 };
-export default compositeSearchPlugin;
+export default bigclawPlugin;
+//# sourceMappingURL=index.d.ts.map
