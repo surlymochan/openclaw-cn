@@ -23,6 +23,7 @@ OPENCLAW_WORKSPACE_PATH="${OPENCLAW_WORKSPACE_PATH:-/root/.openclaw/workspace}"
 OPENCLAW_WORKSPACE_BACKUP_PATH="${OPENCLAW_WORKSPACE_BACKUP_PATH:-/data/openclaw-deploy/workspace-backup.tar}"
 
 KEYS_DIR="${KEYS_DIR:-$PROJECT_ROOT/../keys/openclaw-cn}"
+if [ -n "$KEYS_DIR" ] && [ -f "$KEYS_DIR/server.env" ]; then set -a; source "$KEYS_DIR/server.env"; set +a; fi
 if [ -n "$KEYS_DIR" ] && [ -f "$KEYS_DIR/feishu.env" ]; then source "$KEYS_DIR/feishu.env"; fi
 if [ -n "$KEYS_DIR" ] && [ -f "$KEYS_DIR/search.env" ]; then source "$KEYS_DIR/search.env"; fi
 if [ -n "$KEYS_DIR" ] && [ -f "$KEYS_DIR/llm.env" ]; then source "$KEYS_DIR/llm.env"; fi
@@ -61,22 +62,25 @@ log_info "[2/8] 配置 OpenClaw (openclaw.json)..."
 ssh "$SERVER_USER@$SERVER_IP" "cat > /root/.openclaw/openclaw.json << 'EOF'
 {
   \"meta\": {
-    \"lastTouchedVersion\": \"2026.2.19\",
+    \"lastTouchedVersion\": \"2026.2.13\",
     \"lastTouchedAt\": \"$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)\"
   },
   \"models\": {
     \"mode\": \"merge\",
     \"providers\": {
       \"bailian\": {
-        \"baseUrl\": \"https://dashscope.aliyuncs.com/compatible-mode/v1\",
+        \"baseUrl\": \"https://coding.dashscope.aliyuncs.com/v1\",
         \"apiKey\": \"${BAILIAN_API_KEY:-}\",
         \"api\": \"openai-completions\",
         \"models\": [
           {
-            \"id\": \"qwen3-max\",
-            \"name\": \"Qwen3 Max\",
-            \"contextWindow\": 80000,
-            \"maxTokens\": 8192
+            \"id\": \"qwen3.5-plus\",
+            \"name\": \"qwen3.5-plus\",
+            \"reasoning\": false,
+            \"input\": [\"text\"],
+            \"cost\": { \"input\": 0, \"output\": 0, \"cacheRead\": 0, \"cacheWrite\": 0 },
+            \"contextWindow\": 262144,
+            \"maxTokens\": 65536
           }
         ]
       }
@@ -84,8 +88,10 @@ ssh "$SERVER_USER@$SERVER_IP" "cat > /root/.openclaw/openclaw.json << 'EOF'
   },
   \"agents\": {
     \"defaults\": {
-      \"model\": { \"primary\": \"bailian/qwen3-max\" },
-      \"models\": { \"bailian/qwen3-max\": {} },
+      \"model\": { \"primary\": \"bailian/qwen3.5-plus\" },
+      \"models\": { \"bailian/qwen3.5-plus\": { \"alias\": \"qwen3.5-plus\" } },
+      \"maxConcurrent\": 4,
+      \"subagents\": { \"maxConcurrent\": 8 },
       \"workspace\": \"/home/node/.openclaw/workspace\"
     }
   },
